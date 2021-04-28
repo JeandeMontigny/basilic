@@ -100,6 +100,7 @@ def extract_waveforms(recording, spike_frame_channel_array, padded_channels, nei
         spike_channel_id = spikes[1]
         padded_channel_id = corresponding_channels_ids[spike_channel_id][1]
         real_padded_channel_ids = [id[1] for id in corresponding_channels_ids]
+        print(padded_channel_id)
 
         for channel_id in neighbouring_channels.get(padded_channel_id):
             channel_ids.append(channel_id)

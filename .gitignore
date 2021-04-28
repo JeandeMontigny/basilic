@@ -1,0 +1,9 @@
+# Hidden directories
+.*/
+# Build content
+*egg-info/
+# Dunder directories
+*__/
+build/
+# Tool output files
+*.out
