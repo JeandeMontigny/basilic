@@ -3,10 +3,7 @@ import spikeextractors as se
 import numpy as np
 
 # ---------------------------------------------------------------- #
-def get_recodring_data(recording_file):
-    if (recording_file[:14] != "../recordings/"):
-        recording_file = "../recordings/" + recording_file
-
+def get_recording_data(recording_file):
     recording = se.MEArecRecordingExtractor(recording_file)
     sorting = se.MEArecSortingExtractor(recording_file)
     geom = np.asarray(recording.get_channel_locations())
