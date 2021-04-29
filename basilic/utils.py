@@ -3,6 +3,32 @@ import spikeextractors as se
 import numpy as np
 
 # ---------------------------------------------------------------- #
+def get_recodring_data(recording_file):
+    if (recording_file[:14] != "../recordings/"):
+        recording_file = "../recordings/" + recording_file
+
+    recording = se.MEArecRecordingExtractor(recording_file)
+    sorting = se.MEArecSortingExtractor(recording_file)
+    geom = np.asarray(recording.get_channel_locations())
+
+    spike_times = []
+    for  unit_id in sorting.get_unit_ids():
+        spike_train = sorting.get_unit_spike_train(unit_id=unit_id)
+        spike_times.extend(spike_train)
+    spike_times = sorted(spike_times)
+
+    spike_frame_channel_array = []
+    for i, spike_time in enumerate(spike_times):
+        if i % (int(len(spike_times)/5)) == 0:
+            print(int(float(i)/len(spike_times)*100), '%', end="\r")
+        snippets = np.squeeze(recording.get_snippets(channel_ids=None, reference_frames=[spike_time], snippet_len=10),0)
+        min_channel_id = np.argmin(np.min(snippets, 1))
+        spike_frame_channel_array.append([spike_time, min_channel_id])
+    print("100 %", end="\r")
+
+    return geom, recording, spike_frame_channel_array
+
+# ---------------------------------------------------------------- #
 def make_padded_channels(geom, num_pads = 1):
     sorted_xs = np.unique(np.sort(geom[:,0]))
     buffer_xs = sorted_xs[-1] + (-sorted_xs[0]) + np.unique(np.diff(sorted_xs))[0]
@@ -60,8 +86,8 @@ def extract_waveforms(recording, spike_frame_channel_array, padded_channels, obs
         spike_time = spikes[0]
         spike_channel_id = spikes[1]
         real_neighbour_channel_ids = [channel_id for channel_id in neighbouring_channels.get(spike_channel_id) if observed_channels[channel_id] == 1]
-        real_waveforms = recording.get_snippets(reference_frames=[spike_time], 
-                                                snippet_len=(wf_frames_before_spike, wf_frames_after_spike), 
+        real_waveforms = recording.get_snippets(reference_frames=[spike_time],
+                                                snippet_len=(wf_frames_before_spike, wf_frames_after_spike),
                                                 channel_ids=real_neighbour_channel_ids)[0]
         real_channels_appended = 0
         for channel_id in neighbouring_channels.get(spike_channel_id):
