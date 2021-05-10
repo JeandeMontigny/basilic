@@ -1,6 +1,7 @@
 import spikeextractors as se
 
 import numpy as np
+import h5py
 
 # ---------------------------------------------------------------- #
 def get_recording_data(recording_file):
@@ -16,7 +17,7 @@ def get_recording_data(recording_file):
 
     spike_frame_channel_array = []
     for i, spike_time in enumerate(spike_times):
-        if i % (int(len(spike_times)/5)) == 0:
+        if i % (int(len(spike_times)/100)) == 0:
             print(int(float(i)/len(spike_times)*100), '%', end="\r")
         snippets = np.squeeze(recording.get_snippets(channel_ids=None, reference_frames=[spike_time], snippet_len=10),0)
         min_channel_id = np.argmin(np.min(snippets, 1))
@@ -73,11 +74,19 @@ def get_neighbours_channels(padded_channels, observed_channels, spike_channel_ra
     return neighbouring_channels
 
 # ---------------------------------------------------------------- #
-def extract_waveforms(recording, spike_frame_channel_array, padded_channels, observed_channels,
-                      neighbouring_channels, wf_frames_before_spike=30, wf_frames_after_spike=30):
+# Note: call directly create_save_dataset from it?
+#       would just needs to add recorded_channels_ids in args
+def extract_and_save_waveforms(recording, spike_frame_channel_array, padded_channels, observed_channels,
+                      neighbouring_channels, data_file, wf_frames_before_spike=30, wf_frames_after_spike=30,
+                      save_every=None):
+    idx = 0
     waveforms_list = []
     channel_ids_list = []
     for spikes in spike_frame_channel_array:
+        idx += 1
+        if idx % (int(len(spike_frame_channel_array)/100)) == 0:
+            print(int(float(idx)/len(spike_frame_channel_array)*100), '%', end="\r")
+
         waveforms = []
         channel_ids = []
         spike_time = spikes[0]
@@ -98,5 +107,50 @@ def extract_waveforms(recording, spike_frame_channel_array, padded_channels, obs
 
         waveforms_list.append(waveforms)
         channel_ids_list.append(channel_ids)
+        if save_every != None and ((idx > 0 and idx % save_every == 0) or idx == len(spike_frame_channel_array)):
+            id_start = idx - idx % save_every if idx == len(spike_frame_channel_array) else idx - save_every
+            save_waveforms_data(waveforms_list, channel_ids_list, data_file, id_start, idx, save_every=save_every)
+            waveforms_list = []
+            channel_ids_list = []
 
+    print("100 %", end="\r")
+
+    if save_every == None:
+        save_waveforms_data(waveforms_list, channel_ids_list, data_file)
+
+    #NOTE: return empty lists if save_every != None, due to L 113 & 114
+    #      do not return anything by default?
+    #      later on, whith class 'SpikeLocalisationData', option to keep waveforms as data member?
     return waveforms_list, channel_ids_list
+
+# ---------------------------------------------------------------- #
+def create_save_dataset(spike_frame_channel_array, padded_channels, recorded_channels_ids, num_neighbours,
+                        data_file_name, save_directory = "../data/", len_snippet=60):
+
+    data_file = h5py.File(save_directory + data_file_name, 'w')
+    data_file.create_dataset('spike_time_list', (len(spike_frame_channel_array),))
+    data_file.create_dataset('spike_id_list', (len(spike_frame_channel_array),))
+    data_file.create_dataset('recorded_channels_ids', (len(recorded_channels_ids),))
+    data_file.create_dataset('channel_locations_list', (len(padded_channels), 2))
+    data_file.create_dataset('waveforms_list', (len(spike_frame_channel_array), num_neighbours, len_snippet))
+    data_file.create_dataset('waveforms_ids_list', (len(spike_frame_channel_array), num_neighbours, len_snippet))
+
+    spike_times = []
+    spike_ids = []
+    for spike in spike_frame_channel_array:
+        spike_times.append(spike[0])
+        spike_ids.append(spike[1])
+
+    data_file['spike_time_list'][0:len(spike_times)] = spike_times
+    data_file['spike_id_list'][0:len(spike_times)] = spike_ids
+    data_file['channel_locations_list'][0:len(padded_channels)] = padded_channels
+    data_file['recorded_channels_ids'][0:len(recorded_channels_ids)] = recorded_channels_ids
+
+    return data_file
+
+# ---------------------------------------------------------------- #
+def save_waveforms_data(waveforms_list, channel_ids_list, data_file, id_start=0, id_end=None, save_every=None):
+    if save_every == None:
+        id_end = len(waveforms_list)
+    data_file['waveforms_list'][id_start:id_end] = waveforms_list
+    data_file['waveforms_ids_list'][id_start:id_end] = waveforms_list
