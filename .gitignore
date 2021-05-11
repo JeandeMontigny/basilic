@@ -1,5 +1,9 @@
 # Hidden directories
 .*/
+data/*
+recordings/*
+# not hidden in directories 
+!recordings/description.txt
 # Build content
 *egg-info/
 # Dunder directories
