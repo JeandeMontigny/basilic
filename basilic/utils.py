@@ -125,9 +125,9 @@ def extract_and_save_waveforms(recording, spike_frame_channel_array, padded_chan
 
 # ---------------------------------------------------------------- #
 def create_save_dataset(spike_frame_channel_array, padded_channels, recorded_channels_ids, num_neighbours,
-                        data_file_name, save_directory = "../data/", len_snippet=60):
+                        data_file_name, data_directory = "../data/", len_snippet=60):
+    data_file = h5py.File(save_directory + data_file_name + ".h5", 'w')
 
-    data_file = h5py.File(save_directory + data_file_name, 'w')
     data_file.create_dataset('spike_time_list', (len(spike_frame_channel_array),))
     data_file.create_dataset('spike_id_list', (len(spike_frame_channel_array),))
     data_file.create_dataset('recorded_channels_ids', (len(recorded_channels_ids),))
@@ -154,3 +154,18 @@ def save_waveforms_data(waveforms_list, channel_ids_list, data_file, id_start=0,
         id_end = len(waveforms_list)
     data_file['waveforms_list'][id_start:id_end] = waveforms_list
     data_file['waveforms_ids_list'][id_start:id_end] = waveforms_list
+
+# ---------------------------------------------------------------- #
+def load_data(file_name, data_directory = "../data/"):
+    data_file = h5py.File(data_directory + file_name, 'r')
+
+    spike_time_list = data_file['spike_time_list']
+    spike_id_list = data_file['spike_id_list']
+    recorded_channels_ids = data_file['recorded_channels_ids']
+    channel_locations_list = data_file['channel_locations_list']
+    waveforms_list = data_file['waveforms_list']
+    waveforms_ids_list = data_file['waveforms_ids_list']
+
+    data_file.close()
+
+    return spike_time_list, spike_id_list, recorded_channels_ids, channel_locations_list, waveforms_list, waveforms_ids_list
