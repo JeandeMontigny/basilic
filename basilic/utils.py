@@ -8,6 +8,7 @@ def get_recording_data(recording_file):
     recording = se.MEArecRecordingExtractor(recording_file)
     sorting = se.MEArecSortingExtractor(recording_file)
     geom = np.asarray(recording.get_channel_locations())
+    #TODO: check that geom is 3D. if not, add 0 for all z
 
     spike_times = []
     for  unit_id in sorting.get_unit_ids():
@@ -126,12 +127,12 @@ def extract_and_save_waveforms(recording, spike_frame_channel_array, padded_chan
 # ---------------------------------------------------------------- #
 def create_save_dataset(spike_frame_channel_array, padded_channels, recorded_channels_ids, num_neighbours,
                         data_file_name, data_directory = "../data/", len_snippet=60):
-    data_file = h5py.File(save_directory + data_file_name + ".h5", 'w')
+    data_file = h5py.File(data_directory + data_file_name + ".h5", 'w')
 
     data_file.create_dataset('spike_time_list', (len(spike_frame_channel_array),))
     data_file.create_dataset('spike_id_list', (len(spike_frame_channel_array),))
     data_file.create_dataset('recorded_channels_ids', (len(recorded_channels_ids),))
-    data_file.create_dataset('channel_locations_list', (len(padded_channels), 2))
+    data_file.create_dataset('channel_locations_list', (len(padded_channels), 2)) # , 3 for simulated data, 2 otherwise
     data_file.create_dataset('waveforms_list', (len(spike_frame_channel_array), num_neighbours, len_snippet))
     data_file.create_dataset('waveforms_ids_list', (len(spike_frame_channel_array), num_neighbours, len_snippet))
 
@@ -156,7 +157,52 @@ def save_waveforms_data(waveforms_list, channel_ids_list, data_file, id_start=0,
     data_file['waveforms_ids_list'][id_start:id_end] = waveforms_list
 
 # ---------------------------------------------------------------- #
-def load_data(file_name, data_directory = "../data/"):
+#TODO: a new file for code related to training data creation and
+#      model training might be more appropriated than in preprocessing code
+import torch
+import torch.utils.data
+from collections import namedtuple
+
+# tuple containing information for one spike
+TrainSpike = namedtuple('DataPoint',
+    ['amps', 'waveforms', 'ch_locs', 'center_loc', 'spike_id', 'exp_id', 'min_waveform', 'min_amp'])
+
+# ---------------------------------------------------------------- #
+class TrainingDataSet(torch.utils.data.Dataset):
+    # list of TrainSpike
+    def __init__(self, TrainSpike_data_set):
+        'Initialization'
+        self.TrainSpike_data_set = TrainSpike_data_set
+
+    def __len__(self):
+        'Denotes the total number of samples'
+        return len(self.TrainSpike_data_set)
+
+    def __getspike__(self, index):
+        'Return one sample of data'
+        train_spike = self.TrainSpike_data_set[index]
+
+        # TODO: my data. Which are mandatory? I don't have center_loc/ch_locs, exp_id, min_amp, min_waveform
+        amps = train_spike.amps
+        waveforms = train_spike.waveforms
+        ch_locs = train_spike.ch_locs
+        center_loc = train_spike.center_loc
+        spike_id = train_spike.spike_id
+        exp_id = train_spike.exp_id
+        min_amp = train_spike.min_amp
+        min_waveform = train_spike.min_waveform
+
+        #TODO: sort this out
+        # my datas
+        spike_time_list, spike_id_list, recorded_channels_ids, channel_locations_list, waveforms_list, waveforms_ids_list
+        # decat model data
+        amps, waveforms, ch_locs, center_loc, spike_id, exp_id, min_amp, min_waveform
+
+        return
+
+# ---------------------------------------------------------------- #
+def load_training_data(file_name, data_directory = "../data/"):
+    # load data from the file
     data_file = h5py.File(data_directory + file_name, 'r')
 
     spike_time_list = data_file['spike_time_list']
@@ -168,4 +214,29 @@ def load_data(file_name, data_directory = "../data/"):
 
     data_file.close()
 
-    return spike_time_list, spike_id_list, recorded_channels_ids, channel_locations_list, waveforms_list, waveforms_ids_list
+    # convert data to torch format
+    torch_spike_time_list = torch.from_numpy(spike_time_list).float()
+    torch_spike_id_list = torch.from_numpy(spike_id_list).float()
+    torch_recorded_channels_ids = torch.from_numpy(recorded_channels_ids).float()
+    torch_channel_locations_list = torch.from_numpy(channel_locations_list).float()
+    torch_waveforms_list = torch.from_numpy(waveforms_list).float()
+    torch_waveforms_ids_list = torch.from_numpy(waveforms_ids_list).float()
+
+    TrainSpike_data_set = []
+    # for each spike, create a TrainSpike containing all informations from this spike
+    for i in enumerate(torch_spike_time_list):
+        torch_spike_time_list[i]
+        torch_spike_id_list[i]
+        torch_recorded_channels_ids[i]
+        torch_channel_locations_list[i]
+        torch_waveforms_list[i]
+        torch_waveforms_ids_list[i]
+        # create TrainSpike
+        train_spike = TrainSpike(each_data=each_data)
+        # add it to the data set of TrainSpike
+        TrainSpike_data_set.append(train_spike)
+
+    training_set = TrainingDataSet(TrainSpike_data_set)
+
+    # return spike_time_list, spike_id_list, recorded_channels_ids, channel_locations_list, waveforms_list, waveforms_ids_list
+    return training_set
