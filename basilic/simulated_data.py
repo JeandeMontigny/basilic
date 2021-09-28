@@ -1,5 +1,5 @@
 import numpy as np
-import spikeextractors as se
+import spikeinterface.extractors as se
 
 # ---------------------------------------------------------------- #
 def add_artificial_spikes(X):

@@ -1,4 +1,4 @@
-import spikeextractors as se
+import spikeinterface.extractors as se
 
 import numpy as np
 import h5py
@@ -20,8 +20,8 @@ def get_recording_data(recording_file):
     for i, spike_time in enumerate(spike_times):
         if i % (int(len(spike_times)/100)) == 0:
             print(int(float(i)/len(spike_times)*100), '%', end="\r")
-        snippets = np.squeeze(recording.get_snippets(channel_ids=None, reference_frames=[spike_time], snippet_len=10),0)
-        min_channel_id = np.argmin(np.min(snippets, 1))
+        snippets = recording.get_traces(channel_ids=None, start_frame=spike_time-5, end_frame=spike_time+5)
+        min_channel_id =  np.argmin(np.min(snippets, 0))
         spike_frame_channel_array.append([spike_time, min_channel_id])
     print("100 %", end="\r")
 
@@ -93,9 +93,24 @@ def extract_and_save_waveforms(recording, spike_frame_channel_array, padded_chan
         spike_time = spikes[0]
         spike_channel_id = spikes[1]
         real_neighbour_channel_ids = [channel_id for channel_id in neighbouring_channels.get(spike_channel_id) if observed_channels[channel_id] == 1]
-        real_waveforms = recording.get_snippets(reference_frames=[spike_time],
-                                                snippet_len=(wf_frames_before_spike, wf_frames_after_spike),
-                                                channel_ids=real_neighbour_channel_ids)[0]
+
+        # TODO: channel_ids=real_neighbour_channel_ids not working
+        # real_waveforms = recording.get_traces(channel_ids=real_neighbour_channel_ids,
+        #                                       start_frame=spike_time-wf_frames_before_spike,
+        #                                       end_frame=spike_time+wf_frames_after_spike)
+
+        # -------- start work around for channel_ids=real_neighbour_channel_ids not working -------- #
+        all_waveforms = recording.get_traces(channel_ids=None,
+                                              start_frame=spike_time-wf_frames_before_spike,
+                                              end_frame=spike_time+wf_frames_after_spike)
+        real_waveforms = []
+        for real_neighbour in real_neighbour_channel_ids:
+            real_neighbour_waveform = []
+            for frame in all_waveforms:
+                real_neighbour_waveform.append(frame[real_neighbour])
+            real_waveforms.append(real_neighbour_waveform)
+        # -------- end work around -------- #
+
         real_channels_appended = 0
         for channel_id in neighbouring_channels.get(spike_channel_id):
             channel_ids.append(channel_id)
